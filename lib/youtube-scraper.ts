@@ -119,35 +119,108 @@ class YouTubeScraper {
     if (!this.page) await this.initialize();
     
     try {
-      await this.page!.goto(`${channelUrl}/about`, { waitUntil: 'networkidle2' });
+      // First try the main channel page instead of about page
+      await this.page!.goto(channelUrl, { waitUntil: 'networkidle2' });
+      
+      // Wait longer for content to load
+      await this.delay(5000);
+      
+      // Scroll to trigger lazy loading
+      await this.page!.evaluate(() => {
+        window.scrollTo(0, 500);
+      });
       
       await this.delay(2000);
       
+      // Scroll back up
+      await this.page!.evaluate(() => {
+        window.scrollTo(0, 0);
+      });
+      
+      await this.delay(1000);
+      
       const channelData = await this.page!.evaluate(() => {
         const channelId = window.location.pathname.split('/')[2];
-        const channelTitle = document.querySelector('#channel-title')?.textContent?.trim() || '';
-        const subscriberEl = document.querySelector('#subscriber-count');
-        const subscriberCount = subscriberEl?.textContent?.trim() || '0';
-        const statsEls = document.querySelectorAll('#right-column yt-formatted-string');
-        const description = document.querySelector('#description-container')?.textContent?.trim() || '';
-        const thumbnailEl = document.querySelector('img#img') as HTMLImageElement;
+        const channelTitle = document.querySelector('#channel-title')?.textContent?.trim() || 
+                            document.querySelector('#channel-name')?.textContent?.trim() || 
+                            document.querySelector('[itemprop="name"]')?.textContent?.trim() || '';
         
-        let videoCount = '0';
-        statsEls.forEach(el => {
-          const text = el.textContent || '';
-          if (text.includes('video')) {
-            videoCount = text.replace(/[^0-9]/g, '');
+        // Try multiple selectors for subscriber count
+        let subscriberCount = '0';
+        const subscriberSelectors = [
+          '#subscriber-count',
+          '#owner-sub-count',
+          'yt-formatted-string#subscriber-count',
+          'yt-formatted-string.ytd-c4-tabbed-header-renderer',
+          '[aria-label*="subscriber"]',
+          'yt-subscriber-count',
+          '.subscriber-count',
+          'span.yt-subscription-button-subscriber-count-branded-horizontal',
+          'yt-formatted-string.ytd-channel-name'
+        ];
+        
+        for (const selector of subscriberSelectors) {
+          const el = document.querySelector(selector);
+          if (el && el.textContent) {
+            const text = el.textContent.trim();
+            if (text.includes('subscriber') || text.match(/[\d.]+[KMB]?/)) {
+              subscriberCount = text;
+              break;
+            }
+          }
+        }
+        
+        // Also check aria-labels
+        document.querySelectorAll('[aria-label]').forEach(el => {
+          const label = el.getAttribute('aria-label') || '';
+          if (label.includes('subscriber') && !subscriberCount.match(/\d/)) {
+            const match = label.match(/([\d,\.]+[KMB]?)\s*subscriber/i);
+            if (match) {
+              subscriberCount = match[1];
+            }
           }
         });
+        
+        // Last resort: look for any text containing subscriber count pattern
+        if (subscriberCount === '0') {
+          document.querySelectorAll('*').forEach(el => {
+            const text = el.textContent || '';
+            if (text.length < 100 && text.match(/\d/) && text.toLowerCase().includes('subscriber')) {
+              const match = text.match(/([\d,\.]+[KMB]?)\s*subscriber/i);
+              if (match && subscriberCount === '0') {
+                subscriberCount = match[1];
+                console.log(`Found subscriber count in text: ${subscriberCount}`);
+              }
+            }
+          });
+        }
+        
+        // Look for video count
+        let videoCount = '0';
+        document.querySelectorAll('yt-formatted-string, span').forEach(el => {
+          const text = el.textContent || '';
+          if (text.includes('video') && text.match(/\d/)) {
+            const match = text.match(/([\d,]+)\s*video/i);
+            if (match) {
+              videoCount = match[1].replace(/,/g, '');
+            }
+          }
+        });
+        
+        const description = document.querySelector('#description-container')?.textContent?.trim() || 
+                           document.querySelector('yt-formatted-string#description')?.textContent?.trim() || '';
+        const thumbnailEl = document.querySelector('img#img') as HTMLImageElement;
+        
+        console.log(`[YouTube Scraper] Channel: ${channelTitle}, Subscribers: ${subscriberCount}, Videos: ${videoCount}`);
         
         return {
           channelId,
           channelTitle,
-          subscriberCount,
+          subscriberCount: subscriberCount || '0',
           videoCount,
           description,
           thumbnailUrl: thumbnailEl?.src || '',
-          channelUrl: window.location.origin + window.location.pathname.replace('/about', '')
+          channelUrl: window.location.href
         };
       });
       
@@ -155,7 +228,16 @@ class YouTubeScraper {
       
     } catch (error) {
       console.error('Error getting channel info:', error);
-      return null;
+      // Return basic info even if we can't get all details
+      return {
+        channelId: channelUrl.split('/').pop() || '',
+        channelTitle: 'YouTube Channel',
+        subscriberCount: '0',
+        videoCount: '0',
+        description: '',
+        thumbnailUrl: '',
+        channelUrl
+      };
     }
   }
 

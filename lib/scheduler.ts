@@ -42,11 +42,58 @@ class SearchScheduler {
             continue;
           }
           
+          // Parse published date first to check if we should skip
+          let publishedAt = new Date();
+          let skipVideo = false;
+          
+          if (videoData.publishedAt) {
+            // Handle relative times like "2 hours ago", "1 day ago"
+            const timeStr = videoData.publishedAt.toLowerCase();
+            if (timeStr.includes('hour')) {
+              const hours = parseInt(timeStr.match(/\d+/)?.[0] || '1');
+              publishedAt = new Date(Date.now() - hours * 60 * 60 * 1000);
+            } else if (timeStr.includes('day')) {
+              const days = parseInt(timeStr.match(/\d+/)?.[0] || '1');
+              publishedAt = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+              
+              // For TikTok, skip videos older than 24 hours
+              if (platform === 'TIKTOK' && days > 1) {
+                skipVideo = true;
+                console.log(`[Scheduler] Skipping TikTok video older than 24 hours: ${videoData.title} (${days} days old)`);
+              }
+            } else if (timeStr.includes('week')) {
+              const weeks = parseInt(timeStr.match(/\d+/)?.[0] || '1');
+              publishedAt = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+              
+              // For TikTok, skip videos older than 24 hours
+              if (platform === 'TIKTOK') {
+                skipVideo = true;
+                console.log(`[Scheduler] Skipping TikTok video older than 24 hours: ${videoData.title} (${weeks} weeks old)`);
+              }
+            } else if (timeStr.includes('month')) {
+              // For TikTok, skip videos older than 24 hours
+              if (platform === 'TIKTOK') {
+                skipVideo = true;
+                console.log(`[Scheduler] Skipping TikTok video older than 24 hours: ${videoData.title} (months old)`);
+              }
+            }
+          }
+          
+          // Skip this video if it's too old for TikTok
+          if (skipVideo) {
+            continue;
+          }
+          
           // Use transaction to ensure both influencer and video are created together
           await prisma.$transaction(async (tx) => {
             // Check if influencer exists, create if not
             let influencer = await tx.influencer.findUnique({
-              where: { channelId: videoData.channelId },
+              where: { 
+                channelId_platform: {
+                  channelId: videoData.channelId,
+                  platform: platform
+                }
+              },
             });
             
             if (!influencer) {
@@ -67,23 +114,6 @@ class SearchScheduler {
               });
               
               console.log(`[Scheduler] Created new influencer: ${videoData.channelTitle}`);
-            }
-            
-            // Parse published date
-            let publishedAt = new Date();
-            if (videoData.publishedAt) {
-              // Handle relative times like "2 hours ago", "1 day ago"
-              const timeStr = videoData.publishedAt.toLowerCase();
-              if (timeStr.includes('hour')) {
-                const hours = parseInt(timeStr.match(/\d+/)?.[0] || '1');
-                publishedAt = new Date(Date.now() - hours * 60 * 60 * 1000);
-              } else if (timeStr.includes('day')) {
-                const days = parseInt(timeStr.match(/\d+/)?.[0] || '1');
-                publishedAt = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-              } else if (timeStr.includes('week')) {
-                const weeks = parseInt(timeStr.match(/\d+/)?.[0] || '1');
-                publishedAt = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
-              }
             }
             
             // Create video record within the same transaction
