@@ -73,8 +73,8 @@ export default function TopicManager({
               >
                 <option value="YOUTUBE">YouTube</option>
                 <option value="TIKTOK">TikTok</option>
-                <option value="INSTAGRAM">Instagram</option>
-                <option value="TWITTER">Twitter/X</option>
+                <option value="INSTAGRAM" disabled>Instagram (Coming Soon)</option>
+                <option value="TWITTER" disabled>Twitter/X (Coming Soon)</option>
               </select>
             </div>
             <div className="flex space-x-2">

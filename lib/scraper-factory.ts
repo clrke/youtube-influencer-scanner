@@ -45,9 +45,9 @@ export class ScraperFactory {
       case 'TIKTOK':
         return new TikTokScraper();
       case 'INSTAGRAM':
-        return new InstagramScraper();
+        throw new Error('Instagram scraper coming soon - API integration required');
       case 'TWITTER':
-        return new TwitterScraper();
+        throw new Error('Twitter/X scraper coming soon - API integration required');
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
