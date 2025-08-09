@@ -192,39 +192,6 @@ class TikTokScraper {
       
     } catch (error) {
       console.error('[TikTok Scraper] Error searching videos:', error);
-      
-      // As a fallback, return mock data for testing
-      console.log('[TikTok Scraper] Returning mock data for testing purposes');
-      return [
-        {
-          videoId: `mock_${Date.now()}_1`,
-          title: `${query} - TikTok Video 1`,
-          description: 'Mock TikTok video for testing',
-          channelId: '@mockuser1',
-          channelTitle: 'Mock TikTok User 1',
-          channelUrl: 'https://www.tiktok.com/@mockuser1',
-          viewCount: '1000',
-          likeCount: '100',
-          publishedAt: 'recently',
-          thumbnailUrl: '',
-          videoUrl: `https://www.tiktok.com/@mockuser1/video/${Date.now()}`,
-          duration: '0:30'
-        },
-        {
-          videoId: `mock_${Date.now()}_2`,
-          title: `${query} - TikTok Video 2`,
-          description: 'Mock TikTok video for testing',
-          channelId: '@mockuser2',
-          channelTitle: 'Mock TikTok User 2',
-          channelUrl: 'https://www.tiktok.com/@mockuser2',
-          viewCount: '2000',
-          likeCount: '200',
-          publishedAt: 'recently',
-          thumbnailUrl: '',
-          videoUrl: `https://www.tiktok.com/@mockuser2/video/${Date.now()}`,
-          duration: '0:45'
-        }
-      ];
     }
     
     return videos;

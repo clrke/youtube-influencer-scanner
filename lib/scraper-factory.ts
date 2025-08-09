@@ -1,5 +1,7 @@
 import YouTubeScraper from './youtube-scraper';
 import TikTokScraper from './tiktok-scraper';
+import InstagramScraper from './instagram-scraper';
+import TwitterScraper from './twitter-scraper';
 
 export type Platform = 'YOUTUBE' | 'TIKTOK' | 'INSTAGRAM' | 'TWITTER';
 
@@ -43,11 +45,9 @@ export class ScraperFactory {
       case 'TIKTOK':
         return new TikTokScraper();
       case 'INSTAGRAM':
-        // TODO: Implement Instagram scraper
-        throw new Error('Instagram scraper not implemented yet');
+        return new InstagramScraper();
       case 'TWITTER':
-        // TODO: Implement Twitter scraper
-        throw new Error('Twitter scraper not implemented yet');
+        return new TwitterScraper();
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }

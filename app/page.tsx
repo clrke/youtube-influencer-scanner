@@ -213,7 +213,7 @@ export default function Home() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <PlayCircle className="w-8 h-8 text-blue-600 mr-3" />
-              <h1 className="text-xl font-bold text-gray-900">YouTube Influencer Scanner</h1>
+              <h1 className="text-xl font-bold text-gray-900">Social Media Influencer Scanner</h1>
             </div>
             
             <nav className="flex space-x-4">

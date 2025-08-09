@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
     
     if (search) {
       where.OR = [
-        { channelTitle: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
+        { channelTitle: { contains: search } },
+        { description: { contains: search } }
       ];
     }
     

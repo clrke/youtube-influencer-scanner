@@ -64,17 +64,17 @@ export default function TopicManager({
                 value={newTopicName}
                 onChange={(e) => setNewTopicName(e.target.value)}
                 placeholder="Enter topic name (e.g., 'meta quest', 'AI tools')"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <select
                 value={newTopicPlatform}
                 onChange={(e) => setNewTopicPlatform(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="YOUTUBE">YouTube</option>
                 <option value="TIKTOK">TikTok</option>
-                <option value="INSTAGRAM" disabled>Instagram (Coming Soon)</option>
-                <option value="TWITTER" disabled>Twitter (Coming Soon)</option>
+                <option value="INSTAGRAM">Instagram</option>
+                <option value="TWITTER">Twitter/X</option>
               </select>
             </div>
             <div className="flex space-x-2">
