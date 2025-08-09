@@ -35,36 +35,42 @@ class SearchScheduler {
           // Parse view count (remove commas and convert)
           const viewCount = parseInt(videoData.viewCount.replace(/[^0-9]/g, '') || '0');
           
-          // Check if influencer exists, create if not
-          let influencer = await prisma.influencer.findUnique({
-            where: { channelId: videoData.channelId },
-          });
-          
-          if (!influencer) {
-            // Try to get more channel info
-            const channelInfo = await this.scraper.getChannelInfo(videoData.channelUrl);
-            
-            influencer = await prisma.influencer.create({
-              data: {
-                channelId: videoData.channelId,
-                channelTitle: videoData.channelTitle,
-                channelUrl: videoData.channelUrl,
-                subscriberCount: channelInfo ? parseInt(channelInfo.subscriberCount.replace(/[^0-9]/g, '') || '0') : 0,
-                videoCount: channelInfo ? parseInt(channelInfo.videoCount.replace(/[^0-9]/g, '') || '0') : 0,
-                description: channelInfo?.description,
-                thumbnailUrl: channelInfo?.thumbnailUrl,
-              },
-            });
-            
-            console.log(`[Scheduler] Created new influencer: ${videoData.channelTitle}`);
-          }
-          
-          // Check if video already exists
+          // Check if video already exists first
           const existingVideo = await prisma.video.findUnique({
             where: { videoId: videoData.videoId },
           });
           
-          if (!existingVideo) {
+          if (existingVideo) {
+            console.log(`[Scheduler] Video already exists: ${videoData.title}`);
+            continue;
+          }
+          
+          // Use transaction to ensure both influencer and video are created together
+          await prisma.$transaction(async (tx) => {
+            // Check if influencer exists, create if not
+            let influencer = await tx.influencer.findUnique({
+              where: { channelId: videoData.channelId },
+            });
+            
+            if (!influencer) {
+              // Try to get more channel info
+              const channelInfo = await this.scraper.getChannelInfo(videoData.channelUrl);
+              
+              influencer = await tx.influencer.create({
+                data: {
+                  channelId: videoData.channelId,
+                  channelTitle: videoData.channelTitle,
+                  channelUrl: videoData.channelUrl,
+                  subscriberCount: channelInfo ? parseInt(channelInfo.subscriberCount.replace(/[^0-9]/g, '') || '0') : 0,
+                  videoCount: channelInfo ? parseInt(channelInfo.videoCount.replace(/[^0-9]/g, '') || '0') : 0,
+                  description: channelInfo?.description,
+                  thumbnailUrl: channelInfo?.thumbnailUrl,
+                },
+              });
+              
+              console.log(`[Scheduler] Created new influencer: ${videoData.channelTitle}`);
+            }
+            
             // Parse published date
             let publishedAt = new Date();
             if (videoData.publishedAt) {
@@ -82,8 +88,8 @@ class SearchScheduler {
               }
             }
             
-            // Create video record
-            await prisma.video.create({
+            // Create video record within the same transaction
+            await tx.video.create({
               data: {
                 videoId: videoData.videoId,
                 title: videoData.title,
@@ -100,7 +106,9 @@ class SearchScheduler {
             });
             
             console.log(`[Scheduler] Added video: ${videoData.title}`);
-          }
+          }, {
+            timeout: 15000, // 15 second timeout instead of default 5 seconds
+          });
           
           // Add delay between processing videos
           await this.delay(parseInt(process.env.SCRAPE_DELAY_MS || '2000'));
@@ -111,11 +119,49 @@ class SearchScheduler {
       }
       
       await this.scraper.close();
+      
+      // Clean up orphaned influencers (those with no videos)
+      await this.cleanupOrphanedInfluencers();
+      
       console.log(`[Scheduler] Completed search for ${topicName}`);
       
     } catch (error) {
       console.error(`[Scheduler] Error during search for ${topicName}:`, error);
       await this.scraper.close();
+    }
+  }
+
+  async cleanupOrphanedInfluencers() {
+    try {
+      // Find influencers that have no associated videos
+      const orphanedInfluencers = await prisma.influencer.findMany({
+        where: {
+          videos: {
+            none: {}
+          }
+        },
+        select: {
+          id: true,
+          channelTitle: true
+        }
+      });
+
+      if (orphanedInfluencers.length > 0) {
+        console.log(`[Scheduler] Found ${orphanedInfluencers.length} orphaned influencers, cleaning up...`);
+        
+        // Delete orphaned influencers
+        const result = await prisma.influencer.deleteMany({
+          where: {
+            id: {
+              in: orphanedInfluencers.map(i => i.id)
+            }
+          }
+        });
+        
+        console.log(`[Scheduler] Removed ${result.count} orphaned influencers: ${orphanedInfluencers.map(i => i.channelTitle).join(', ')}`);
+      }
+    } catch (error) {
+      console.error('[Scheduler] Error cleaning up orphaned influencers:', error);
     }
   }
 
