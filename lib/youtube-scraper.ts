@@ -209,7 +209,35 @@ class YouTubeScraper {
         
         const description = document.querySelector('#description-container')?.textContent?.trim() || 
                            document.querySelector('yt-formatted-string#description')?.textContent?.trim() || '';
-        const thumbnailEl = document.querySelector('img#img') as HTMLImageElement;
+        
+        // Look for channel avatar/profile picture with multiple selectors
+        let thumbnailUrl = '';
+        const avatarSelectors = [
+          'yt-img-shadow#avatar img',           // Main channel avatar
+          '#channel-header-container img',      // Header container
+          '.yt-spec-avatar-shape img',         // Avatar shape
+          'ytd-c4-tabbed-header-renderer img', // Tabbed header
+          '#img.ytd-c4-tabbed-header-renderer', // Header image
+          'img[style*="border-radius"]',       // Rounded images (likely avatars)
+          'yt-image img[alt*="channel"]',      // Channel image
+          '#avatar img',                       // Simple avatar ID
+          'img[alt*="profile"]'                // Profile image
+        ];
+        
+        for (const selector of avatarSelectors) {
+          const el = document.querySelector(selector) as HTMLImageElement;
+          if (el?.src && el.src.includes('yt') && !el.src.includes('default')) {
+            thumbnailUrl = el.src;
+            console.log(`[YouTube] Found avatar with selector: ${selector}`);
+            break;
+          }
+        }
+        
+        // Fallback to any img if no specific avatar found
+        if (!thumbnailUrl) {
+          const imgEl = document.querySelector('img#img') as HTMLImageElement;
+          thumbnailUrl = imgEl?.src || '';
+        }
         
         console.log(`[YouTube Scraper] Channel: ${channelTitle}, Subscribers: ${subscriberCount}, Videos: ${videoCount}`);
         
@@ -219,7 +247,7 @@ class YouTubeScraper {
           subscriberCount: subscriberCount || '0',
           videoCount,
           description,
-          thumbnailUrl: thumbnailEl?.src || '',
+          thumbnailUrl,
           channelUrl: window.location.href
         };
       });

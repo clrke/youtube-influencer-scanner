@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, BarChart3, Users, PlayCircle } from 'lucide-react';
+import { Search, Filter, BarChart3, Users, PlayCircle, RefreshCw } from 'lucide-react';
 import InfluencerCard from '@/components/InfluencerCard';
 import TopicManager from '@/components/TopicManager';
 import Analytics from '@/components/Analytics';
@@ -11,6 +11,7 @@ export default function Home() {
   const [influencers, setInfluencers] = useState<Array<{ id: string; status: string; channelTitle: string; subscriberCount: number; _count: { videos: number }; videos?: Array<{ id: string; title: string; videoUrl: string; viewCount: number }>; lastContactedAt?: string }>>([]);
   const [topics, setTopics] = useState<Array<{ id: string; name: string; active: boolean; createdAt: string; _count?: { searches: number } }>>([]);
   const [loading, setLoading] = useState(true);
+  const [reloading, setReloading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [topicFilter, setTopicFilter] = useState('ALL');
@@ -179,6 +180,44 @@ export default function Home() {
     }
   };
 
+  const handleReloadInfluencers = async () => {
+    if (influencers.length === 0) {
+      alert('No influencers to re-scrape. Please add some influencers first.');
+      return;
+    }
+
+    setReloading(true);
+    try {
+      // Get IDs of currently displayed influencers
+      const influencerIds = influencers.map(inf => inf.id);
+      
+      const response = await fetch('/api/influencers/reload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ influencerIds })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Reload result:', result);
+        
+        // Refresh the influencer list after reloading
+        await fetchInfluencers();
+        
+        // Show success message
+        alert(`Successfully updated ${result.updated} out of ${result.total} currently visible influencers with fresh data from social platforms.`);
+      } else {
+        const error = await response.json();
+        alert(`Failed to reload influencers: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to reload influencers:', error);
+      alert('Failed to reload influencers. Please try again.');
+    } finally {
+      setReloading(false);
+    }
+  };
+
   // Mock analytics data (replace with real data from API)
   const mockAnalytics = {
     totalInfluencers: influencers.length,
@@ -327,6 +366,16 @@ export default function Home() {
                     <option value="TWITTER">Twitter</option>
                   </select>
                 </div>
+
+                <button
+                  onClick={handleReloadInfluencers}
+                  disabled={reloading || influencers.length === 0}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={`Re-scrape data from social platforms for ${influencers.length} currently visible influencers`}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-1 ${reloading ? 'animate-spin' : ''}`} />
+                  {reloading ? 'Re-scraping...' : `Re-scrape (${influencers.length})`}
+                </button>
 
                 {(statusFilter !== 'ALL' || topicFilter !== 'ALL' || searchTerm || minSubscribersFilter || platformFilter !== 'ALL') && (
                   <button
