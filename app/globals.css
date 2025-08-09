@@ -40,3 +40,19 @@ textarea::placeholder {
   color: #6b7280 !important; /* gray-500 */
   opacity: 1 !important;
 }
+
+/* Fix select dropdown text color to be more visible */
+select {
+  color: #374151 !important; /* gray-700 */
+}
+
+select option {
+  color: #374151 !important; /* gray-700 */
+  background-color: #ffffff !important; /* white background */
+}
+
+/* Ensure text is dark in select dropdowns */
+select:focus,
+select:active {
+  color: #111827 !important; /* gray-900 */
+}

@@ -13,6 +13,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [topicFilter, setTopicFilter] = useState('ALL');
+  const [minSubscribersFilter, setMinSubscribersFilter] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [analyticsStats, setAnalyticsStats] = useState<{ totalInfluencers: number; newThisWeek: number; contacted: number; responded: number; converted: number; conversionRate: number; avgResponseTime: number; statusBreakdown: Array<{ name: string; value: number }>; weeklyTrend: Array<{ date: string; new: number; contacted: number; converted: number }> } | null>(null);
@@ -24,7 +27,10 @@ export default function Home() {
         page: currentPage.toString(),
         limit: '12',
         ...(statusFilter !== 'ALL' && { status: statusFilter }),
-        ...(searchTerm && { search: searchTerm })
+        ...(searchTerm && { search: searchTerm }),
+        ...(topicFilter !== 'ALL' && { topicId: topicFilter }),
+        ...(minSubscribersFilter && { minSubscribers: minSubscribersFilter }),
+        ...(platformFilter !== 'ALL' && { platform: platformFilter })
       });
       
       const response = await fetch(`/api/influencers?${params}`);
@@ -37,7 +43,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, statusFilter, searchTerm]);
+  }, [currentPage, statusFilter, searchTerm, topicFilter, minSubscribersFilter, platformFilter]);
 
   const fetchTopics = async () => {
     try {
@@ -61,9 +67,16 @@ export default function Home() {
     }
   };
 
+  // Reset to page 1 when filters change (except currentPage itself)
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [statusFilter, searchTerm, topicFilter, minSubscribersFilter, platformFilter]);
+
   useEffect(() => {
     fetchInfluencers();
-  }, [currentPage, statusFilter, searchTerm, fetchInfluencers]);
+  }, [currentPage, statusFilter, searchTerm, topicFilter, minSubscribersFilter, platformFilter, fetchInfluencers]);
 
   useEffect(() => {
     fetchTopics();
@@ -104,12 +117,12 @@ export default function Home() {
     }
   };
 
-  const handleAddTopic = async (name: string) => {
+  const handleAddTopic = async (name: string, platform: string) => {
     try {
       const response = await fetch('/api/topics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name, platform })
       });
       
       if (response.ok) {
@@ -259,22 +272,77 @@ export default function Home() {
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <Filter className="text-gray-400 w-5 h-5" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="ALL">All Status</option>
-                  <option value="NEW">New</option>
-                  <option value="CONTACTED">Contacted</option>
-                  <option value="RESPONDED">Responded</option>
-                  <option value="NEGOTIATING">Negotiating</option>
-                  <option value="CONVERTED">Converted</option>
-                  <option value="NOT_INTERESTED">Not Interested</option>
-                  <option value="BLACKLISTED">Blacklisted</option>
-                </select>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Filter className="text-gray-400 w-5 h-5" />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="ALL">All Status</option>
+                    <option value="NEW">New</option>
+                    <option value="CONTACTED">Contacted</option>
+                    <option value="RESPONDED">Responded</option>
+                    <option value="NEGOTIATING">Negotiating</option>
+                    <option value="CONVERTED">Converted</option>
+                    <option value="NOT_INTERESTED">Not Interested</option>
+                    <option value="BLACKLISTED">Blacklisted</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <select
+                    value={topicFilter}
+                    onChange={(e) => setTopicFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="ALL">All Topics</option>
+                    {topics.map(topic => (
+                      <option key={topic.id} value={topic.id}>{topic.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    placeholder="Min subscribers"
+                    value={minSubscribersFilter}
+                    onChange={(e) => setMinSubscribersFilter(e.target.value)}
+                    className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <select
+                    value={platformFilter}
+                    onChange={(e) => setPlatformFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="ALL">All Platforms</option>
+                    <option value="YOUTUBE">YouTube</option>
+                    <option value="TIKTOK">TikTok</option>
+                    <option value="INSTAGRAM">Instagram</option>
+                    <option value="TWITTER">Twitter</option>
+                  </select>
+                </div>
+
+                {(statusFilter !== 'ALL' || topicFilter !== 'ALL' || searchTerm || minSubscribersFilter || platformFilter !== 'ALL') && (
+                  <button
+                    onClick={() => {
+                      setStatusFilter('ALL');
+                      setTopicFilter('ALL');
+                      setSearchTerm('');
+                      setMinSubscribersFilter('');
+                      setPlatformFilter('ALL');
+                      setCurrentPage(1);
+                    }}
+                    className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 underline"
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
             </div>
 

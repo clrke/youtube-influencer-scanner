@@ -9,11 +9,14 @@ datasource db {
 
 model SearchTopic {
   id        String   @id @default(cuid())
-  name      String   @unique
+  name      String
+  platform  Platform @default(YOUTUBE)
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   searches  Search[]
+  
+  @@unique([name, platform])
 }
 
 model Search {
@@ -48,8 +51,9 @@ model Video {
 
 model Influencer {
   id              String          @id @default(cuid())
-  channelId       String          @unique
+  channelId       String
   channelTitle    String
+  platform        Platform        @default(YOUTUBE)
   subscriberCount Int             @default(0)
   videoCount      Int             @default(0)
   viewCount       Int             @default(0)
@@ -64,6 +68,8 @@ model Influencer {
   videos          Video[]
   outreaches      Outreach[]
   tags            Tag[]
+  
+  @@unique([channelId, platform])
 }
 
 model Outreach {
@@ -95,4 +101,11 @@ enum InfluencerStatus {
   CONVERTED
   NOT_INTERESTED
   BLACKLISTED
+}
+
+enum Platform {
+  YOUTUBE
+  TIKTOK
+  INSTAGRAM
+  TWITTER
 }

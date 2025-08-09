@@ -20,21 +20,21 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name } = await request.json();
+    const { name, platform = 'YOUTUBE' } = await request.json();
     
     if (!name) {
       return NextResponse.json({ error: 'Topic name is required' }, { status: 400 });
     }
     
     const topic = await prisma.searchTopic.create({
-      data: { name }
+      data: { name, platform }
     });
     
     // Try to start scheduler but don't fail if it doesn't work
     // Skip initial search to avoid Puppeteer issues on topic creation
     try {
       const intervalHours = parseInt(process.env.SEARCH_INTERVAL_HOURS || '4');
-      await scheduler.startScheduler(topic.id, topic.name, intervalHours, true);
+      await scheduler.startScheduler(topic.id, topic.name, platform as any, intervalHours, true);
     } catch (schedulerError) {
       console.error('[API] Failed to start scheduler:', schedulerError);
       // Continue - topic was created successfully

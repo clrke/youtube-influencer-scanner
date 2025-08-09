@@ -17,7 +17,7 @@ export async function POST(
     }
     
     // Trigger manual search
-    await scheduler.performSearch(topic.id, topic.name);
+    await scheduler.performSearch(topic.id, topic.name, topic.platform as any);
     
     return NextResponse.json({ success: true });
   } catch {

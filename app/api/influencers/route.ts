@@ -7,6 +7,9 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const topicId = searchParams.get('topicId');
+    const minSubscribers = searchParams.get('minSubscribers');
+    const platform = searchParams.get('platform');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     
@@ -21,6 +24,26 @@ export async function GET(request: NextRequest) {
         { channelTitle: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } }
       ];
+    }
+    
+    if (topicId && topicId !== 'ALL') {
+      where.videos = {
+        some: {
+          search: {
+            topicId: topicId
+          }
+        }
+      };
+    }
+    
+    if (minSubscribers) {
+      where.subscriberCount = {
+        gte: parseInt(minSubscribers)
+      };
+    }
+    
+    if (platform && platform !== 'ALL') {
+      where.platform = platform;
     }
     
     const [influencers, total] = await Promise.all([

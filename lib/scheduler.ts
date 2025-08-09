@@ -1,23 +1,20 @@
 import cron from 'node-cron';
 import { prisma } from './db';
-import YouTubeScraper from './youtube-scraper';
+import { ScraperFactory, type Platform, type Scraper } from './scraper-factory';
 
 class SearchScheduler {
-  private scraper: YouTubeScraper;
   private tasks: Map<string, cron.ScheduledTask> = new Map();
 
-  constructor() {
-    this.scraper = new YouTubeScraper();
-  }
-
-  async performSearch(topicId: string, topicName: string) {
-    console.log(`[Scheduler] Starting search for topic: ${topicName}`);
+  async performSearch(topicId: string, topicName: string, platform: Platform = 'YOUTUBE') {
+    console.log(`[Scheduler] Starting ${platform} search for topic: ${topicName}`);
+    
+    const scraper = ScraperFactory.createScraper(platform);
     
     try {
-      await this.scraper.initialize();
+      await scraper.initialize();
       
       // Search for videos from the last 24 hours
-      const videos = await this.scraper.searchVideos(topicName, 'today');
+      const videos = await scraper.searchVideos(topicName, 'today');
       
       console.log(`[Scheduler] Found ${videos.length} videos for ${topicName}`);
       
@@ -54,13 +51,14 @@ class SearchScheduler {
             
             if (!influencer) {
               // Try to get more channel info
-              const channelInfo = await this.scraper.getChannelInfo(videoData.channelUrl);
+              const channelInfo = await scraper.getChannelInfo(videoData.channelUrl);
               
               influencer = await tx.influencer.create({
                 data: {
                   channelId: videoData.channelId,
                   channelTitle: videoData.channelTitle,
                   channelUrl: videoData.channelUrl,
+                  platform: platform,
                   subscriberCount: channelInfo ? parseInt(channelInfo.subscriberCount.replace(/[^0-9]/g, '') || '0') : 0,
                   videoCount: channelInfo ? parseInt(channelInfo.videoCount.replace(/[^0-9]/g, '') || '0') : 0,
                   description: channelInfo?.description,
@@ -118,16 +116,16 @@ class SearchScheduler {
         }
       }
       
-      await this.scraper.close();
+      await scraper.close();
       
       // Clean up orphaned influencers (those with no videos)
       await this.cleanupOrphanedInfluencers();
       
-      console.log(`[Scheduler] Completed search for ${topicName}`);
+      console.log(`[Scheduler] Completed ${platform} search for ${topicName}`);
       
     } catch (error) {
-      console.error(`[Scheduler] Error during search for ${topicName}:`, error);
-      await this.scraper.close();
+      console.error(`[Scheduler] Error during ${platform} search for ${topicName}:`, error);
+      await scraper.close();
     }
   }
 
@@ -165,29 +163,29 @@ class SearchScheduler {
     }
   }
 
-  async startScheduler(topicId: string, topicName: string, intervalHours: number = 4, skipInitialSearch: boolean = false) {
+  async startScheduler(topicId: string, topicName: string, platform: Platform = 'YOUTUBE', intervalHours: number = 4, skipInitialSearch: boolean = false) {
     // Stop existing task if any
     this.stopScheduler(topicId);
     
     // Perform initial search if not skipped
     if (!skipInitialSearch) {
       try {
-        await this.performSearch(topicId, topicName);
+        await this.performSearch(topicId, topicName, platform);
       } catch (error) {
-        console.error(`[Scheduler] Initial search failed for ${topicName}:`, error);
+        console.error(`[Scheduler] Initial search failed for ${topicName} on ${platform}:`, error);
       }
     }
     
     // Schedule recurring searches
     const cronExpression = `0 */${intervalHours} * * *`; // Every N hours
     const task = cron.schedule(cronExpression, async () => {
-      await this.performSearch(topicId, topicName);
+      await this.performSearch(topicId, topicName, platform);
     });
     
     this.tasks.set(topicId, task);
     task.start();
     
-    console.log(`[Scheduler] Started scheduler for ${topicName} every ${intervalHours} hours`);
+    console.log(`[Scheduler] Started ${platform} scheduler for ${topicName} every ${intervalHours} hours`);
   }
 
   stopScheduler(topicId: string) {
