@@ -2,6 +2,30 @@ import cron from 'node-cron';
 import { prisma } from './db';
 import { ScraperFactory, type Platform, type Scraper } from './scraper-factory';
 
+// Helper function to parse subscriber/video counts with K/M/B suffixes
+function parseCountString(countStr: string): number {
+  if (!countStr) return 0;
+  
+  // Remove extra whitespace and make lowercase
+  const cleaned = countStr.trim().toLowerCase();
+  
+  // Extract number and suffix
+  const match = cleaned.match(/([\d,\.]+)\s*([kmb])?/);
+  if (!match) return 0;
+  
+  const [, numberPart, suffix] = match;
+  const number = parseFloat(numberPart.replace(/,/g, ''));
+  
+  if (isNaN(number)) return 0;
+  
+  switch (suffix) {
+    case 'k': return Math.round(number * 1000);
+    case 'm': return Math.round(number * 1000000);
+    case 'b': return Math.round(number * 1000000000);
+    default: return Math.round(number);
+  }
+}
+
 class SearchScheduler {
   private tasks: Map<string, cron.ScheduledTask> = new Map();
 
@@ -106,8 +130,8 @@ class SearchScheduler {
                   channelTitle: videoData.channelTitle,
                   channelUrl: videoData.channelUrl,
                   platform: platform,
-                  subscriberCount: channelInfo ? parseInt(channelInfo.subscriberCount.replace(/[^0-9]/g, '') || '0') : 0,
-                  videoCount: channelInfo ? parseInt(channelInfo.videoCount.replace(/[^0-9]/g, '') || '0') : 0,
+                  subscriberCount: channelInfo ? parseCountString(channelInfo.subscriberCount) : 0,
+                  videoCount: channelInfo ? parseCountString(channelInfo.videoCount) : 0,
                   description: channelInfo?.description,
                   thumbnailUrl: channelInfo?.thumbnailUrl,
                 },

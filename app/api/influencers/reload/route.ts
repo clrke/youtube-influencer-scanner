@@ -2,6 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { ScraperFactory } from '@/lib/scraper-factory';
 
+// Helper function to parse subscriber/video counts with K/M/B suffixes
+function parseCountString(countStr: string): number {
+  if (!countStr) return 0;
+  
+  // Remove extra whitespace and make lowercase
+  const cleaned = countStr.trim().toLowerCase();
+  
+  // Extract number and suffix
+  const match = cleaned.match(/([\d,\.]+)\s*([kmb])?/);
+  if (!match) return 0;
+  
+  const [, numberPart, suffix] = match;
+  const number = parseFloat(numberPart.replace(/,/g, ''));
+  
+  if (isNaN(number)) return 0;
+  
+  switch (suffix) {
+    case 'k': return Math.round(number * 1000);
+    case 'm': return Math.round(number * 1000000);
+    case 'b': return Math.round(number * 1000000000);
+    default: return Math.round(number);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -44,8 +68,8 @@ export async function POST(request: NextRequest) {
             where: { id: influencer.id },
             data: {
               channelTitle: channelInfo.channelTitle || influencer.channelTitle,
-              subscriberCount: parseInt(channelInfo.subscriberCount.replace(/[^\d]/g, '') || '0'),
-              videoCount: parseInt(channelInfo.videoCount.replace(/[^\d]/g, '') || '0'),
+              subscriberCount: parseCountString(channelInfo.subscriberCount),
+              videoCount: parseCountString(channelInfo.videoCount),
               description: channelInfo.description,
               thumbnailUrl: channelInfo.thumbnailUrl,
               updatedAt: new Date()
