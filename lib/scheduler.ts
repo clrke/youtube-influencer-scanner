@@ -1,0 +1,172 @@
+import cron from 'node-cron';
+import { prisma } from './db';
+import YouTubeScraper from './youtube-scraper';
+
+class SearchScheduler {
+  private scraper: YouTubeScraper;
+  private tasks: Map<string, cron.ScheduledTask> = new Map();
+
+  constructor() {
+    this.scraper = new YouTubeScraper();
+  }
+
+  async performSearch(topicId: string, topicName: string) {
+    console.log(`[Scheduler] Starting search for topic: ${topicName}`);
+    
+    try {
+      await this.scraper.initialize();
+      
+      // Search for videos from the last 24 hours
+      const videos = await this.scraper.searchVideos(topicName, 'today');
+      
+      console.log(`[Scheduler] Found ${videos.length} videos for ${topicName}`);
+      
+      // Create search record
+      const search = await prisma.search.create({
+        data: {
+          topicId,
+          resultCount: videos.length,
+        },
+      });
+      
+      // Process each video
+      for (const videoData of videos) {
+        try {
+          // Parse view count (remove commas and convert)
+          const viewCount = parseInt(videoData.viewCount.replace(/[^0-9]/g, '') || '0');
+          
+          // Check if influencer exists, create if not
+          let influencer = await prisma.influencer.findUnique({
+            where: { channelId: videoData.channelId },
+          });
+          
+          if (!influencer) {
+            // Try to get more channel info
+            const channelInfo = await this.scraper.getChannelInfo(videoData.channelUrl);
+            
+            influencer = await prisma.influencer.create({
+              data: {
+                channelId: videoData.channelId,
+                channelTitle: videoData.channelTitle,
+                channelUrl: videoData.channelUrl,
+                subscriberCount: channelInfo ? parseInt(channelInfo.subscriberCount.replace(/[^0-9]/g, '') || '0') : 0,
+                videoCount: channelInfo ? parseInt(channelInfo.videoCount.replace(/[^0-9]/g, '') || '0') : 0,
+                description: channelInfo?.description,
+                thumbnailUrl: channelInfo?.thumbnailUrl,
+              },
+            });
+            
+            console.log(`[Scheduler] Created new influencer: ${videoData.channelTitle}`);
+          }
+          
+          // Check if video already exists
+          const existingVideo = await prisma.video.findUnique({
+            where: { videoId: videoData.videoId },
+          });
+          
+          if (!existingVideo) {
+            // Parse published date
+            let publishedAt = new Date();
+            if (videoData.publishedAt) {
+              // Handle relative times like "2 hours ago", "1 day ago"
+              const timeStr = videoData.publishedAt.toLowerCase();
+              if (timeStr.includes('hour')) {
+                const hours = parseInt(timeStr.match(/\d+/)?.[0] || '1');
+                publishedAt = new Date(Date.now() - hours * 60 * 60 * 1000);
+              } else if (timeStr.includes('day')) {
+                const days = parseInt(timeStr.match(/\d+/)?.[0] || '1');
+                publishedAt = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+              } else if (timeStr.includes('week')) {
+                const weeks = parseInt(timeStr.match(/\d+/)?.[0] || '1');
+                publishedAt = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+              }
+            }
+            
+            // Create video record
+            await prisma.video.create({
+              data: {
+                videoId: videoData.videoId,
+                title: videoData.title,
+                description: videoData.description || '',
+                channelId: videoData.channelId,
+                channelTitle: videoData.channelTitle,
+                publishedAt,
+                viewCount,
+                thumbnailUrl: videoData.thumbnailUrl,
+                videoUrl: videoData.videoUrl,
+                searchId: search.id,
+                influencerId: influencer.id,
+              },
+            });
+            
+            console.log(`[Scheduler] Added video: ${videoData.title}`);
+          }
+          
+          // Add delay between processing videos
+          await this.delay(parseInt(process.env.SCRAPE_DELAY_MS || '2000'));
+          
+        } catch (error) {
+          console.error(`[Scheduler] Error processing video ${videoData.videoId}:`, error);
+        }
+      }
+      
+      await this.scraper.close();
+      console.log(`[Scheduler] Completed search for ${topicName}`);
+      
+    } catch (error) {
+      console.error(`[Scheduler] Error during search for ${topicName}:`, error);
+      await this.scraper.close();
+    }
+  }
+
+  async startScheduler(topicId: string, topicName: string, intervalHours: number = 4, skipInitialSearch: boolean = false) {
+    // Stop existing task if any
+    this.stopScheduler(topicId);
+    
+    // Perform initial search if not skipped
+    if (!skipInitialSearch) {
+      try {
+        await this.performSearch(topicId, topicName);
+      } catch (error) {
+        console.error(`[Scheduler] Initial search failed for ${topicName}:`, error);
+      }
+    }
+    
+    // Schedule recurring searches
+    const cronExpression = `0 */${intervalHours} * * *`; // Every N hours
+    const task = cron.schedule(cronExpression, async () => {
+      await this.performSearch(topicId, topicName);
+    });
+    
+    this.tasks.set(topicId, task);
+    task.start();
+    
+    console.log(`[Scheduler] Started scheduler for ${topicName} every ${intervalHours} hours`);
+  }
+
+  stopScheduler(topicId: string) {
+    const task = this.tasks.get(topicId);
+    if (task) {
+      task.stop();
+      this.tasks.delete(topicId);
+      console.log(`[Scheduler] Stopped scheduler for topic ${topicId}`);
+    }
+  }
+
+  stopAllSchedulers() {
+    this.tasks.forEach((task, topicId) => {
+      task.stop();
+      console.log(`[Scheduler] Stopped scheduler for topic ${topicId}`);
+    });
+    this.tasks.clear();
+  }
+
+  private delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Create singleton instance
+const scheduler = new SearchScheduler();
+
+export default scheduler;

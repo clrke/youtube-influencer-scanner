@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model SearchTopic {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  searches  Search[]
+}
+
+model Search {
+  id          String      @id @default(cuid())
+  topicId     String
+  topic       SearchTopic @relation(fields: [topicId], references: [id])
+  executedAt  DateTime    @default(now())
+  resultCount Int         @default(0)
+  videos      Video[]
+}
+
+model Video {
+  id             String      @id @default(cuid())
+  videoId        String      @unique
+  title          String
+  description    String
+  channelId      String
+  channelTitle   String
+  publishedAt    DateTime
+  viewCount      Int         @default(0)
+  likeCount      Int         @default(0)
+  commentCount   Int         @default(0)
+  thumbnailUrl   String
+  videoUrl       String
+  searchId       String
+  search         Search      @relation(fields: [searchId], references: [id])
+  influencerId   String
+  influencer     Influencer  @relation(fields: [influencerId], references: [id])
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Influencer {
+  id              String          @id @default(cuid())
+  channelId       String          @unique
+  channelTitle    String
+  subscriberCount Int             @default(0)
+  videoCount      Int             @default(0)
+  viewCount       Int             @default(0)
+  description     String?
+  thumbnailUrl    String?
+  channelUrl      String
+  status          InfluencerStatus @default(NEW)
+  notes           String?
+  lastContactedAt DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  videos          Video[]
+  outreaches      Outreach[]
+  tags            Tag[]
+}
+
+model Outreach {
+  id           String     @id @default(cuid())
+  influencerId String
+  influencer   Influencer @relation(fields: [influencerId], references: [id])
+  message      String
+  platform     String     @default("YouTube")
+  response     String?
+  responseDate DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Tag {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  color       String       @default("#3B82F6")
+  influencers Influencer[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+enum InfluencerStatus {
+  NEW
+  CONTACTED
+  RESPONDED
+  NEGOTIATING
+  CONVERTED
+  NOT_INTERESTED
+  BLACKLISTED
+}

@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3697:3697"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:./prisma/dev.db
+      - SEARCH_INTERVAL_HOURS=4
+      - HEADLESS_BROWSER=true
+      - SCRAPE_DELAY_MS=2000
+      - PORT=3697
+    volumes:
+      - ./prisma/dev.db:/app/prisma/dev.db
+    restart: unless-stopped
+    depends_on:
+      - db-setup
+    
+  db-setup:
+    build: .
+    command: npx prisma db push
+    environment:
+      - DATABASE_URL=file:./prisma/dev.db
+    volumes:
+      - ./prisma:/app/prisma
+    restart: "no"

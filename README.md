@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# YouTube Influencer Scanner CRM
 
-## Getting Started
+A comprehensive web application that automatically discovers YouTube influencers by scraping videos on specific topics every 4 hours, then provides a CRM-like interface for sales teams to manage outreach efforts.
 
-First, run the development server:
+## 🚀 Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Automated YouTube Scraping**: No API keys needed - scrapes YouTube for videos from the last 24 hours
+- **Smart Scheduling**: Searches every 4 hours for fresh influencer content
+- **CRM Interface**: Professional dashboard for managing influencer relationships
+- **Status Tracking**: Track outreach progress from "New" to "Converted"
+- **Analytics Dashboard**: Monitor conversion rates, response times, and performance metrics
+- **Topic Management**: Add/remove search topics with individual controls
+- **Mobile Responsive**: Works seamlessly on desktop and mobile devices
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📋 Prerequisites
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Node.js 18+ 
+- npm or yarn
+- Docker (optional, for containerized deployment)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🛠️ Installation
 
-## Learn More
+### Option 1: Local Development
 
-To learn more about Next.js, take a look at the following resources:
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Initialize database**:
+   ```bash
+   npm run db:generate
+   npm run db:push
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Start development server**:
+   ```bash
+   npm run dev
+   ```
 
-## Deploy on Vercel
+4. **Open application**: Navigate to `http://localhost:3697`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Option 2: Docker Deployment
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Deploy with Docker Compose**:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Access application**: Open `http://localhost:3697`
+
+## 📖 Usage Guide
+
+### Getting Started
+
+1. **Add Search Topics**: 
+   - Navigate to the "Topics" tab
+   - Click "Add Topic" 
+   - Enter keywords like "meta quest", "AI tools", "react tutorial"
+   - Topics will automatically start searching every 4 hours
+
+2. **Manage Influencers**:
+   - View discovered influencers in the "Influencers" tab
+   - Filter by status, search by name
+   - Click influencer cards to view details
+
+3. **Track Outreach**:
+   - Use the "Reach Out" button on new influencers
+   - Update status as conversations progress
+   - Add notes for team collaboration
+
+4. **Monitor Performance**:
+   - Check the "Analytics" tab for insights
+   - Track conversion rates and response times
+   - Identify top-performing topics
+
+### Status Workflow
+
+- **New**: Freshly discovered influencer
+- **Contacted**: Outreach message sent
+- **Responded**: Influencer replied
+- **Negotiating**: In active discussions
+- **Converted**: Successful partnership
+- **Not Interested**: Declined collaboration
+- **Blacklisted**: Do not contact
+
+## 🏗️ Architecture
+
+### Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend**: Next.js API Routes, Prisma ORM
+- **Database**: SQLite (easily replaceable)
+- **Scraping**: Puppeteer (headless browser automation)
+- **Charts**: Recharts
+- **Scheduling**: node-cron
+- **Icons**: Lucide React
+
+## ⚠️ Disclaimer
+
+This tool is for legitimate business outreach purposes only. Users are responsible for:
+- Complying with YouTube's Terms of Service
+- Respecting influencer privacy and communication preferences
+- Following anti-spam regulations (CAN-SPAM Act, GDPR, etc.)
+- Using reasonable scraping delays to avoid service disruption
+
+---
+
+**Built with ❤️ for ethical influencer marketing**

@@ -1,103 +1,345 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Filter, BarChart3, Users, PlayCircle } from 'lucide-react';
+import InfluencerCard from '@/components/InfluencerCard';
+import TopicManager from '@/components/TopicManager';
+import Analytics from '@/components/Analytics';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [activeTab, setActiveTab] = useState<'influencers' | 'topics' | 'analytics'>('influencers');
+  const [influencers, setInfluencers] = useState<Array<{ id: string; status: string; channelTitle: string; subscriberCount: number; _count: { videos: number }; videos?: Array<{ id: string; title: string; videoUrl: string; viewCount: number }>; lastContactedAt?: string }>>([]);
+  const [topics, setTopics] = useState<Array<{ id: string; name: string; active: boolean; createdAt: string; _count?: { searches: number } }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [analyticsStats, setAnalyticsStats] = useState<{ totalInfluencers: number; newThisWeek: number; contacted: number; responded: number; converted: number; conversionRate: number; avgResponseTime: number; statusBreakdown: Array<{ name: string; value: number }>; weeklyTrend: Array<{ date: string; new: number; contacted: number; converted: number }> } | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const fetchInfluencers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '12',
+        ...(statusFilter !== 'ALL' && { status: statusFilter }),
+        ...(searchTerm && { search: searchTerm })
+      });
+      
+      const response = await fetch(`/api/influencers?${params}`);
+      const data = await response.json();
+      
+      setInfluencers(data.influencers || []);
+      setTotalPages(data.pagination?.totalPages || 1);
+    } catch (error) {
+      console.error('Failed to fetch influencers:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, statusFilter, searchTerm]);
+
+  const fetchTopics = async () => {
+    try {
+      const response = await fetch('/api/topics');
+      const data = await response.json();
+      setTopics(data || []);
+    } catch (error) {
+      console.error('Failed to fetch topics:', error);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      const response = await fetch('/api/analytics');
+      if (response.ok) {
+        const data = await response.json();
+        setAnalyticsStats(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch analytics:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchInfluencers();
+  }, [currentPage, statusFilter, searchTerm, fetchInfluencers]);
+
+  useEffect(() => {
+    fetchTopics();
+    fetchAnalytics();
+  }, []);
+
+  const handleStatusChange = async (id: string, status: string) => {
+    try {
+      const response = await fetch(`/api/influencers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      
+      if (response.ok) {
+        fetchInfluencers();
+        fetchAnalytics();
+      }
+    } catch (error) {
+      console.error('Failed to update status:', error);
+    }
+  };
+
+  const handleOutreach = async (id: string, message: string) => {
+    try {
+      const response = await fetch(`/api/influencers/${id}/outreach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+      
+      if (response.ok) {
+        fetchInfluencers();
+        fetchAnalytics();
+      }
+    } catch (error) {
+      console.error('Failed to create outreach:', error);
+    }
+  };
+
+  const handleAddTopic = async (name: string) => {
+    try {
+      const response = await fetch('/api/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      
+      if (response.ok) {
+        fetchTopics();
+      }
+    } catch (error) {
+      console.error('Failed to add topic:', error);
+    }
+  };
+
+  const handleToggleTopic = async (id: string, active: boolean) => {
+    try {
+      const response = await fetch(`/api/topics/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active })
+      });
+      
+      if (response.ok) {
+        fetchTopics();
+      }
+    } catch (error) {
+      console.error('Failed to toggle topic:', error);
+    }
+  };
+
+  const handleDeleteTopic = async (id: string) => {
+    if (confirm('Are you sure you want to delete this topic?')) {
+      try {
+        const response = await fetch(`/api/topics/${id}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          fetchTopics();
+        }
+      } catch (error) {
+        console.error('Failed to delete topic:', error);
+      }
+    }
+  };
+
+  const handleManualSearch = async (id: string) => {
+    try {
+      const response = await fetch(`/api/topics/${id}/search`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        fetchInfluencers();
+      }
+    } catch (error) {
+      console.error('Failed to trigger search:', error);
+    }
+  };
+
+  // Mock analytics data (replace with real data from API)
+  const mockAnalytics = {
+    totalInfluencers: influencers.length,
+    newThisWeek: 23,
+    contacted: influencers.filter(i => i.status !== 'NEW').length,
+    responded: influencers.filter(i => ['RESPONDED', 'NEGOTIATING', 'CONVERTED'].includes(i.status)).length,
+    converted: influencers.filter(i => i.status === 'CONVERTED').length,
+    conversionRate: 12.5,
+    avgResponseTime: 18,
+    statusBreakdown: [
+      { name: 'New', value: influencers.filter(i => i.status === 'NEW').length },
+      { name: 'Contacted', value: influencers.filter(i => i.status === 'CONTACTED').length },
+      { name: 'Responded', value: influencers.filter(i => i.status === 'RESPONDED').length },
+      { name: 'Negotiating', value: influencers.filter(i => i.status === 'NEGOTIATING').length },
+      { name: 'Converted', value: influencers.filter(i => i.status === 'CONVERTED').length }
+    ],
+    weeklyTrend: [
+      { date: 'Mon', new: 5, contacted: 3, converted: 1 },
+      { date: 'Tue', new: 8, contacted: 6, converted: 2 },
+      { date: 'Wed', new: 6, contacted: 4, converted: 1 },
+      { date: 'Thu', new: 10, contacted: 7, converted: 3 },
+      { date: 'Fri', new: 12, contacted: 9, converted: 2 },
+      { date: 'Sat', new: 4, contacted: 2, converted: 1 },
+      { date: 'Sun', new: 3, contacted: 1, converted: 0 }
+    ]
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <PlayCircle className="w-8 h-8 text-blue-600 mr-3" />
+              <h1 className="text-xl font-bold text-gray-900">YouTube Influencer Scanner</h1>
+            </div>
+            
+            <nav className="flex space-x-4">
+              <button
+                onClick={() => setActiveTab('influencers')}
+                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+                  activeTab === 'influencers' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Users className="w-4 h-4 mr-1" />
+                Influencers
+              </button>
+              <button
+                onClick={() => setActiveTab('topics')}
+                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+                  activeTab === 'topics' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Search className="w-4 h-4 mr-1" />
+                Topics
+              </button>
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+                  activeTab === 'analytics' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4 mr-1" />
+                Analytics
+              </button>
+            </nav>
+          </div>
         </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'influencers' && (
+          <div>
+            <div className="mb-6 flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Search influencers..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Filter className="text-gray-400 w-5 h-5" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ALL">All Status</option>
+                  <option value="NEW">New</option>
+                  <option value="CONTACTED">Contacted</option>
+                  <option value="RESPONDED">Responded</option>
+                  <option value="NEGOTIATING">Negotiating</option>
+                  <option value="CONVERTED">Converted</option>
+                  <option value="NOT_INTERESTED">Not Interested</option>
+                  <option value="BLACKLISTED">Blacklisted</option>
+                </select>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            ) : influencers.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No influencers found. Add topics to start discovering influencers.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {influencers.map(influencer => (
+                    <InfluencerCard
+                      key={influencer.id}
+                      influencer={influencer}
+                      onStatusChange={handleStatusChange}
+                      onOutreach={handleOutreach}
+                    />
+                  ))}
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="mt-8 flex items-center justify-center space-x-2">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-gray-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'topics' && (
+          <TopicManager
+            topics={topics}
+            onAddTopic={handleAddTopic}
+            onToggleTopic={handleToggleTopic}
+            onDeleteTopic={handleDeleteTopic}
+            onManualSearch={handleManualSearch}
+          />
+        )}
+
+        {activeTab === 'analytics' && (
+          <Analytics stats={analyticsStats || mockAnalytics} />
+        )}
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
