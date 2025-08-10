@@ -37,11 +37,22 @@ class TikTokScraper {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-web-security',
-        '--disable-features=VizDisplayCompositor'
-      ]
+        '--disable-features=VizDisplayCompositor',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions'
+      ],
+      protocolTimeout: 60000, // Increase timeout to 60 seconds
+      timeout: 60000
     });
     
     this.page = await this.browser.newPage();
+    
+    // Set default navigation timeout
+    await this.page.setDefaultNavigationTimeout(60000);
+    await this.page.setDefaultTimeout(60000);
     
     // Set viewport and user agent
     await this.page.setViewport({ width: 1920, height: 1080 });

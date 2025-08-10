@@ -22,9 +22,6 @@ interface InfluencerCardProps {
 }
 
 export default function InfluencerCard({ influencer, onStatusChange, onOutreach }: InfluencerCardProps) {
-  const [showOutreachForm, setShowOutreachForm] = useState(false);
-  const [outreachMessage, setOutreachMessage] = useState('');
-
   const statusColors = {
     NEW: 'bg-blue-100 text-blue-800',
     CONTACTED: 'bg-yellow-100 text-yellow-800',
@@ -49,14 +46,6 @@ export default function InfluencerCard({ influencer, onStatusChange, onOutreach 
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
-  };
-
-  const handleOutreach = () => {
-    if (outreachMessage.trim()) {
-      onOutreach(influencer.id, outreachMessage);
-      setOutreachMessage('');
-      setShowOutreachForm(false);
-    }
   };
 
   return (
@@ -137,16 +126,6 @@ export default function InfluencerCard({ influencer, onStatusChange, onOutreach 
             <ExternalLink className="w-4 h-4 mr-1" />
             View Channel
           </a>
-          
-          {influencer.status === 'NEW' && (
-            <button
-              onClick={() => setShowOutreachForm(!showOutreachForm)}
-              className="inline-flex items-center px-3 py-1 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-            >
-              <MessageSquare className="w-4 h-4 mr-1" />
-              Reach Out
-            </button>
-          )}
         </div>
 
         <select
@@ -163,32 +142,6 @@ export default function InfluencerCard({ influencer, onStatusChange, onOutreach 
           <option value="BLACKLISTED">Blacklisted</option>
         </select>
       </div>
-
-      {showOutreachForm && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-md">
-          <textarea
-            value={outreachMessage}
-            onChange={(e) => setOutreachMessage(e.target.value)}
-            placeholder="Enter your outreach message..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows={3}
-          />
-          <div className="mt-2 flex justify-end space-x-2">
-            <button
-              onClick={() => setShowOutreachForm(false)}
-              className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleOutreach}
-              className="px-3 py-1 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Send & Mark as Contacted
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

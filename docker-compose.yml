@@ -20,9 +20,9 @@ services:
     
   db-setup:
     build: .
-    command: npx prisma db push
+    command: npx prisma db push --skip-generate
     environment:
       - DATABASE_URL=file:./prisma/dev.db
     volumes:
-      - ./prisma:/app/prisma
+      - ./prisma/dev.db:/app/prisma/dev.db
     restart: "no"

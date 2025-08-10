@@ -31,10 +31,25 @@ class YouTubeScraper {
   async initialize() {
     this.browser = await puppeteer.launch({
       headless: process.env.HEADLESS_BROWSER !== 'false',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox', 
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions'
+      ],
+      protocolTimeout: 60000, // Increase timeout to 60 seconds
+      timeout: 60000
     });
     this.page = await this.browser.newPage();
     await this.page.setViewport({ width: 1920, height: 1080 });
+    
+    // Set default navigation timeout
+    await this.page.setDefaultNavigationTimeout(60000);
+    await this.page.setDefaultTimeout(60000);
     
     // Set user agent to avoid detection
     await this.page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
