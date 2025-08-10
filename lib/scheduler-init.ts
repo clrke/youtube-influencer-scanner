@@ -16,7 +16,7 @@ export async function initializeSchedulers() {
     const intervalHours = parseInt(process.env.SEARCH_INTERVAL_HOURS || '4');
     
     for (const topic of activeTopics) {
-      await scheduler.startScheduler(topic.id, topic.name, intervalHours);
+      await scheduler.startScheduler(topic.id, topic.name, topic.platform as any, intervalHours);
     }
     
     console.log('[Scheduler] All schedulers initialized');

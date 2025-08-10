@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { prisma } from './db';
 import { ScraperFactory, type Platform, type Scraper } from './scraper-factory';
+import ScanService from './scan-service';
 
 // Helper function to parse subscriber/video counts with K/M/B suffixes
 function parseCountString(countStr: string): number {
@@ -29,18 +30,39 @@ function parseCountString(countStr: string): number {
 class SearchScheduler {
   private tasks: Map<string, cron.ScheduledTask> = new Map();
 
-  async performSearch(topicId: string, topicName: string, platform: Platform = 'YOUTUBE') {
-    console.log(`[Scheduler] Starting ${platform} search for topic: ${topicName}`);
+  async performSearch(topicId: string, topicName: string, platform: Platform = 'YOUTUBE', isManual: boolean = false) {
+    const scanService = ScanService.getInstance();
+    
+    // Create scan in database
+    const scan = await scanService.createScan(isManual ? 'manual' : 'scheduled', {
+      topicId,
+      topicName,
+      platform
+    });
     
     const scraper = ScraperFactory.createScraper(platform);
     
     try {
+      // Check for cancellation
+      if (await scanService.checkShouldCancel(scan.id)) {
+        await scanService.completeScan(scan.id, 'cancelled', 'Scan was cancelled during initialization');
+        return;
+      }
+
+      await scanService.log(scan.id, 'info', 'Initializing scraper...');
       await scraper.initialize();
       
+      await scanService.log(scan.id, 'info', 'Searching for videos...');
       // Search for videos from the last 24 hours
       const videos = await scraper.searchVideos(topicName, 'today');
       
-      console.log(`[Scheduler] Found ${videos.length} videos for ${topicName}`);
+      await scanService.log(scan.id, 'info', `Found ${videos.length} videos for processing`);
+      
+      // Update total count
+      await prisma.scan.update({
+        where: { id: scan.id },
+        data: { total: videos.length }
+      });
       
       // Create search record
       const search = await prisma.search.create({
@@ -51,8 +73,19 @@ class SearchScheduler {
       });
       
       // Process each video
+      let processedCount = 0;
       for (const videoData of videos) {
         try {
+          // Check for cancellation
+          if (await scanService.checkShouldCancel(scan.id)) {
+            await scanService.completeScan(scan.id, 'cancelled', 'Scan was cancelled during video processing');
+            await scraper.close();
+            return;
+          }
+
+          processedCount++;
+          await scanService.updateProgress(scan.id, processedCount, `Processing: ${videoData.title.substring(0, 50)}...`);
+          
           // Parse view count (remove commas and convert)
           const viewCount = parseInt(videoData.viewCount.replace(/[^0-9]/g, '') || '0');
           
@@ -62,7 +95,7 @@ class SearchScheduler {
           });
           
           if (existingVideo) {
-            console.log(`[Scheduler] Video already exists: ${videoData.title}`);
+            await scanService.log(scan.id, 'info', `Skipping existing video: ${videoData.title}`);
             continue;
           }
           
@@ -157,7 +190,7 @@ class SearchScheduler {
               },
             });
             
-            console.log(`[Scheduler] Added video: ${videoData.title}`);
+            await scanService.log(scan.id, 'success', `Added video: ${videoData.title}`);
           }, {
             timeout: 15000, // 15 second timeout instead of default 5 seconds
           });
@@ -166,19 +199,21 @@ class SearchScheduler {
           await this.delay(parseInt(process.env.SCRAPE_DELAY_MS || '2000'));
           
         } catch (error) {
-          console.error(`[Scheduler] Error processing video ${videoData.videoId}:`, error);
+          await scanService.log(scan.id, 'error', `Error processing video ${videoData.videoId}: ${error}`);
         }
       }
       
       await scraper.close();
       
+      await scanService.log(scan.id, 'info', 'Cleaning up orphaned influencers...');
       // Clean up orphaned influencers (those with no videos)
       await this.cleanupOrphanedInfluencers();
       
-      console.log(`[Scheduler] Completed ${platform} search for ${topicName}`);
+      await scanService.completeScan(scan.id, 'completed', `Completed ${platform} search for ${topicName}. Processed ${processedCount} videos.`);
       
     } catch (error) {
-      console.error(`[Scheduler] Error during ${platform} search for ${topicName}:`, error);
+      await scanService.log(scan.id, 'error', `Error during ${platform} search: ${error}`);
+      await scanService.completeScan(scan.id, 'error', `Failed ${platform} search for ${topicName}: ${error}`);
       await scraper.close();
     }
   }

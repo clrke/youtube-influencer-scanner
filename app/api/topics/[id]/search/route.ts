@@ -16,8 +16,8 @@ export async function POST(
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
     
-    // Trigger manual search
-    await scheduler.performSearch(topic.id, topic.name, topic.platform as any);
+    // Trigger manual search (last parameter true indicates manual)
+    await scheduler.performSearch(topic.id, topic.name, topic.platform as any, true);
     
     return NextResponse.json({ success: true });
   } catch {

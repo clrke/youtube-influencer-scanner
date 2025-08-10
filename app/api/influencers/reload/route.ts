@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { ScraperFactory } from '@/lib/scraper-factory';
+import ScanService from '@/lib/scan-service';
 
 // Helper function to parse subscriber/video counts with K/M/B suffixes
 function parseCountString(countStr: string): number {
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { influencerIds } = body;
     
+    const scanService = ScanService.getInstance();
+    
     // If specific influencer IDs are provided, reload those, otherwise reload all
     const whereClause = influencerIds?.length > 0 
       ? { id: { in: influencerIds } }
@@ -50,12 +53,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'No influencers found to reload' });
     }
 
+    // Create scan in database
+    const scan = await scanService.createScan('rescrape', {
+      total: influencers.length
+    });
+    
+    await scanService.log(scan.id, 'info', `Found ${influencers.length} influencers to re-scrape`);
+
     let updatedCount = 0;
     const results = [];
 
-    for (const influencer of influencers) {
+    for (let i = 0; i < influencers.length; i++) {
+      const influencer = influencers[i];
+      
       try {
-        console.log(`[Reload] Re-scraping ${influencer.platform} influencer: ${influencer.channelTitle}`);
+        // Check for cancellation
+        if (await scanService.checkShouldCancel(scan.id)) {
+          await scanService.completeScan(scan.id, 'cancelled', 'Re-scrape was cancelled by user');
+          return NextResponse.json({ 
+            error: 'Scan cancelled', 
+            updated: updatedCount, 
+            total: influencers.length,
+            scanId: scan.id
+          });
+        }
+
+        await scanService.updateProgress(scan.id, i + 1, `Re-scraping: ${influencer.channelTitle}`);
+        await scanService.log(scan.id, 'info', `Re-scraping ${influencer.platform} influencer: ${influencer.channelTitle}`);
         
         const scraper = ScraperFactory.createScraper(influencer.platform as any);
         await scraper.initialize();
@@ -85,7 +109,7 @@ export async function POST(request: NextRequest) {
             videoCount: channelInfo.videoCount
           });
           
-          console.log(`[Reload] Updated ${influencer.channelTitle}: ${channelInfo.subscriberCount} subscribers, ${channelInfo.videoCount} videos`);
+          await scanService.log(scan.id, 'success', `Updated ${influencer.channelTitle}: ${channelInfo.subscriberCount} subscribers, ${channelInfo.videoCount} videos`);
         } else {
           results.push({
             id: influencer.id,
@@ -93,7 +117,7 @@ export async function POST(request: NextRequest) {
             status: 'failed',
             error: 'Could not fetch channel info'
           });
-          console.log(`[Reload] Failed to update ${influencer.channelTitle}: Could not fetch channel info`);
+          await scanService.log(scan.id, 'warning', `Failed to update ${influencer.channelTitle}: Could not fetch channel info`);
         }
 
         await scraper.close();
@@ -102,7 +126,7 @@ export async function POST(request: NextRequest) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         
       } catch (error) {
-        console.error(`[Reload] Error updating ${influencer.channelTitle}:`, error);
+        await scanService.log(scan.id, 'error', `Error updating ${influencer.channelTitle}: ${error}`);
         results.push({
           id: influencer.id,
           channelTitle: influencer.channelTitle,
@@ -112,11 +136,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await scanService.completeScan(scan.id, 'completed', `Successfully reloaded ${updatedCount} out of ${influencers.length} influencers`);
+
     return NextResponse.json({
       message: `Successfully reloaded ${updatedCount} out of ${influencers.length} influencers`,
       updated: updatedCount,
       total: influencers.length,
-      results
+      results,
+      scanId: scan.id
     });
     
   } catch (error) {

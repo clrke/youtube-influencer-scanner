@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, BarChart3, Users, PlayCircle, RefreshCw } from 'lucide-react';
+import { Search, Filter, BarChart3, Users, PlayCircle, RefreshCw, Activity } from 'lucide-react';
 import InfluencerCard from '@/components/InfluencerCard';
 import TopicManager from '@/components/TopicManager';
 import Analytics from '@/components/Analytics';
+import ScanMonitor from '@/components/ScanMonitor';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'influencers' | 'topics' | 'analytics'>('influencers');
@@ -12,6 +13,7 @@ export default function Home() {
   const [topics, setTopics] = useState<Array<{ id: string; name: string; active: boolean; createdAt: string; _count?: { searches: number } }>>([]);
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
+  const [showScanMonitor, setShowScanMonitor] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [topicFilter, setTopicFilter] = useState('ALL');
@@ -255,6 +257,17 @@ export default function Home() {
               <h1 className="text-xl font-bold text-gray-900">Social Media Influencer Scanner</h1>
             </div>
             
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setShowScanMonitor(true)}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                title="View scan activity and logs"
+              >
+                <Activity className="w-4 h-4 mr-1" />
+                Scan Monitor
+              </button>
+            </div>
+            
             <nav className="flex space-x-4">
               <button
                 onClick={() => setActiveTab('influencers')}
@@ -457,6 +470,11 @@ export default function Home() {
           <Analytics stats={analyticsStats || mockAnalytics} />
         )}
       </main>
+
+      {/* Scan Monitor Modal */}
+      {showScanMonitor && (
+        <ScanMonitor onClose={() => setShowScanMonitor(false)} />
+      )}
     </div>
   );
 }
