@@ -28,35 +28,84 @@ class YouTubeScraper {
   private browser: Browser | null = null;
   private page: Page | null = null;
 
-  async initialize() {
-    this.browser = await puppeteer.launch({
-      headless: process.env.HEADLESS_BROWSER !== 'false',
-      args: [
-        '--no-sandbox', 
-        '--disable-setuid-sandbox', 
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-extensions'
-      ],
-      protocolTimeout: 60000, // Increase timeout to 60 seconds
-      timeout: 60000
-    });
-    this.page = await this.browser.newPage();
-    await this.page.setViewport({ width: 1920, height: 1080 });
-    
-    // Set default navigation timeout
-    await this.page.setDefaultNavigationTimeout(60000);
-    await this.page.setDefaultTimeout(60000);
-    
-    // Set user agent to avoid detection
-    await this.page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+  async initialize(retries = 3) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`[YouTube Scraper] Initializing browser (attempt ${attempt}/${retries})...`);
+        
+        this.browser = await puppeteer.launch({
+          headless: 'new', // Use new headless mode
+          args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox', 
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-extensions',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-features=TranslateUI',
+            '--disable-ipc-flooding-protection',
+            '--enable-features=NetworkService',
+            '--force-color-profile=srgb',
+            '--window-size=1920,1080'
+          ],
+          protocolTimeout: 120000, // Increase timeout to 120 seconds
+          timeout: 120000
+        });
+        
+        this.page = await this.browser.newPage();
+        
+        // Set default timeouts before other operations
+        await this.page.setDefaultNavigationTimeout(120000);
+        await this.page.setDefaultTimeout(120000);
+        
+        await this.page.setViewport({ width: 1920, height: 1080 });
+        
+        // Set user agent to avoid detection
+        await this.page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        console.log('[YouTube Scraper] Browser initialized successfully');
+        return; // Success, exit the retry loop
+        
+      } catch (error) {
+        console.error(`[YouTube Scraper] Initialization attempt ${attempt} failed:`, error);
+        
+        // Clean up any partially initialized resources
+        if (this.browser) {
+          try {
+            await this.browser.close();
+          } catch (closeError) {
+            console.error('[YouTube Scraper] Error closing browser:', closeError);
+          }
+          this.browser = null;
+          this.page = null;
+        }
+        
+        if (attempt === retries) {
+          throw new Error(`Failed to initialize browser after ${retries} attempts: ${error}`);
+        }
+        
+        // Wait before retrying
+        await this.delay(2000 * attempt); // Exponential backoff
+      }
+    }
   }
 
   async searchVideos(query: string, filter: 'hour' | 'today' | 'week' | 'month' = 'today'): Promise<VideoData[]> {
-    if (!this.page) await this.initialize();
+    if (!this.page) {
+      await this.initialize();
+    }
+    
+    // Check if page is still connected
+    if (!this.page || this.page.isClosed()) {
+      console.log('[YouTube Scraper] Page was closed, reinitializing...');
+      this.browser = null;
+      this.page = null;
+      await this.initialize();
+    }
     
     const videos: VideoData[] = [];
     

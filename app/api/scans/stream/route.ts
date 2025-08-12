@@ -12,32 +12,60 @@ export async function GET(request: NextRequest) {
       // Send initial connection message
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected' })}\n\n`));
       
-      let lastCheckTime = new Date();
+      let lastLogCheck = new Date(Date.now() - 60000); // Start checking from 1 minute ago
       
       const interval = setInterval(async () => {
         try {
-          // Get scans updated since last check
+          // Get all active scans (running or recently completed)
           const scans = await prisma.scan.findMany({
             where: {
               OR: [
                 { status: 'running' },
-                { updatedAt: { gte: lastCheckTime } }
+                { 
+                  AND: [
+                    { status: { not: 'running' } },
+                    { completedAt: { gte: new Date(Date.now() - 30 * 60 * 1000) } } // Keep completed scans for 30 minutes
+                  ]
+                }
               ]
             },
             include: {
-              logs: {
-                where: { createdAt: { gte: lastCheckTime } },
-                orderBy: { createdAt: 'desc' },
-                take: 10
-              }
+              logs: true // Simplified - get all logs without conditions
             },
             orderBy: { startedAt: 'desc' }
           });
           
-          if (scans.length > 0) {
+          // Debug logging
+          console.log(`[SSE] Found ${scans.length} scans, total logs: ${scans.reduce((sum, s) => sum + (s.logs?.length || 0), 0)}`);
+          
+          // Also get only new logs since last check for incremental updates
+          const newLogs = await prisma.scanLog.findMany({
+            where: {
+              createdAt: { gt: lastLogCheck },
+              scan: {
+                OR: [
+                  { status: 'running' },
+                  { 
+                    AND: [
+                      { status: { not: 'running' } },
+                      { completedAt: { gte: new Date(Date.now() - 30 * 60 * 1000) } }
+                    ]
+                  }
+                ]
+              }
+            },
+            include: {
+              scan: {
+                select: { id: true }
+              }
+            }
+          });
+          
+          if (scans.length > 0 || newLogs.length > 0) {
             const data = JSON.stringify({ 
               type: 'update', 
               scans,
+              newLogs,
               timestamp: new Date()
             });
             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
@@ -46,7 +74,7 @@ export async function GET(request: NextRequest) {
           // Send heartbeat to keep connection alive
           controller.enqueue(encoder.encode(`:heartbeat\n\n`));
           
-          lastCheckTime = new Date();
+          lastLogCheck = new Date();
         } catch (error) {
           console.error('SSE error:', error);
           controller.error(error);

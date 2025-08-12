@@ -141,22 +141,32 @@ class SearchScheduler {
             continue;
           }
           
+          // Check if influencer exists first (outside transaction)
+          let influencer = await prisma.influencer.findUnique({
+            where: { 
+              channelId_platform: {
+                channelId: videoData.channelId,
+                platform: platform
+              }
+            },
+          });
+          
+          let channelInfo = null;
+          
+          // If influencer doesn't exist, get channel info first (outside transaction)
+          if (!influencer) {
+            try {
+              // Try to get more channel info
+              channelInfo = await scraper.getChannelInfo(videoData.channelUrl);
+            } catch (error) {
+              console.log(`[Scheduler] Could not fetch channel info for ${videoData.channelTitle}: ${error}`);
+            }
+          }
+          
           // Use transaction to ensure both influencer and video are created together
           await prisma.$transaction(async (tx) => {
-            // Check if influencer exists, create if not
-            let influencer = await tx.influencer.findUnique({
-              where: { 
-                channelId_platform: {
-                  channelId: videoData.channelId,
-                  platform: platform
-                }
-              },
-            });
-            
+            // If influencer doesn't exist, create it
             if (!influencer) {
-              // Try to get more channel info
-              const channelInfo = await scraper.getChannelInfo(videoData.channelUrl);
-              
               influencer = await tx.influencer.create({
                 data: {
                   channelId: videoData.channelId,
@@ -192,7 +202,8 @@ class SearchScheduler {
             
             await scanService.log(scan.id, 'success', `Added video: ${videoData.title}`);
           }, {
-            timeout: 15000, // 15 second timeout instead of default 5 seconds
+            timeout: 30000, // Increase timeout to 30 seconds
+            maxWait: 30000, // Maximum time to wait for a transaction to start
           });
           
           // Add delay between processing videos

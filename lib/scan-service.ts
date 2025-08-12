@@ -62,13 +62,17 @@ class ScanService {
   ) {
     console.log(`[Scan ${scanId}] [${level.toUpperCase()}] ${message}`);
     
-    return await prisma.scanLog.create({
-      data: {
-        scanId,
-        level,
-        message
-      }
-    });
+    try {
+      await prisma.scanLog.create({
+        data: {
+          scanId,
+          level,
+          message
+        }
+      });
+    } catch (error) {
+      console.error(`Failed to write log to database: ${error}`);
+    }
   }
 
   async completeScan(
@@ -142,8 +146,8 @@ class ScanService {
       },
       include: {
         logs: {
-          orderBy: { createdAt: 'desc' },
-          take: 50
+          orderBy: { createdAt: 'desc' }
+          // No limit - return all logs
         }
       },
       orderBy: { startedAt: 'desc' }

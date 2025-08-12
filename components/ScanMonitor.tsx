@@ -103,28 +103,64 @@ export default function ScanMonitor({ onClose }: ScanMonitorProps) {
         
         if (data.type === 'connected') {
           setConnected(true);
-        } else if (data.type === 'update' && data.scans) {
-          // Update scans with real-time data
-          const updatedScans = data.scans.map((scan: any) => ({
-            ...scan,
-            startedAt: new Date(scan.startedAt),
-            completedAt: scan.completedAt ? new Date(scan.completedAt) : null,
-            logs: scan.logs?.map((log: any) => ({
-              ...log,
-              createdAt: new Date(log.createdAt)
-            })) || []
-          }));
-          
-          setScans(prevScans => {
-            // Merge updated scans with existing ones
-            const scanMap = new Map(prevScans.map(scan => [scan.id, scan]));
-            updatedScans.forEach((scan: Scan) => {
-              scanMap.set(scan.id, scan);
+        } else if (data.type === 'update') {
+          // Handle full scan updates
+          if (data.scans) {
+            const updatedScans = data.scans.map((scan: any) => ({
+              ...scan,
+              startedAt: new Date(scan.startedAt),
+              completedAt: scan.completedAt ? new Date(scan.completedAt) : null,
+              logs: scan.logs?.map((log: any) => ({
+                ...log,
+                createdAt: new Date(log.createdAt)
+              })) || []
+            }));
+            
+            // Debug logging
+            console.log('[ScanMonitor] SSE update received:', {
+              scanCount: updatedScans.length,
+              totalLogs: updatedScans.reduce((sum: number, s: any) => sum + (s.logs?.length || 0), 0),
+              firstScanLogs: updatedScans[0]?.logs?.length || 0
             });
-            return Array.from(scanMap.values()).sort((a, b) => 
-              b.startedAt.getTime() - a.startedAt.getTime()
-            );
-          });
+            
+            setScans(updatedScans);
+          }
+          
+          // Handle incremental log updates
+          if (data.newLogs && data.newLogs.length > 0) {
+            setScans(prevScans => {
+              const scanMap = new Map(prevScans.map(scan => [scan.id, scan]));
+              
+              // Group new logs by scan ID
+              const logsByScan = new Map<string, any[]>();
+              data.newLogs.forEach((log: any) => {
+                const scanId = log.scan.id;
+                if (!logsByScan.has(scanId)) {
+                  logsByScan.set(scanId, []);
+                }
+                logsByScan.get(scanId)!.push({
+                  ...log,
+                  createdAt: new Date(log.createdAt)
+                });
+              });
+              
+              // Add new logs to existing scans
+              logsByScan.forEach((newLogs, scanId) => {
+                const scan = scanMap.get(scanId);
+                if (scan) {
+                  const logMap = new Map(scan.logs?.map(log => [log.id, log]) || []);
+                  newLogs.forEach(log => logMap.set(log.id, log));
+                  scan.logs = Array.from(logMap.values()).sort((a, b) => 
+                    b.createdAt.getTime() - a.createdAt.getTime()
+                  );
+                }
+              });
+              
+              return Array.from(scanMap.values()).sort((a, b) => 
+                b.startedAt.getTime() - a.startedAt.getTime()
+              );
+            });
+          }
         }
       } catch (error) {
         console.error('Error processing SSE message:', error);
