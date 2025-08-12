@@ -165,10 +165,26 @@ class SearchScheduler {
           
           // Use transaction to ensure both influencer and video are created together
           await prisma.$transaction(async (tx) => {
-            // If influencer doesn't exist, create it
+            // If influencer doesn't exist, create or update it
             if (!influencer) {
-              influencer = await tx.influencer.create({
-                data: {
+              // Use upsert to handle race conditions
+              influencer = await tx.influencer.upsert({
+                where: {
+                  channelId_platform: {
+                    channelId: videoData.channelId,
+                    platform: platform
+                  }
+                },
+                update: {
+                  // Update with latest info if it exists
+                  channelTitle: videoData.channelTitle,
+                  channelUrl: videoData.channelUrl,
+                  subscriberCount: channelInfo ? parseCountString(channelInfo.subscriberCount) : 0,
+                  videoCount: channelInfo ? parseCountString(channelInfo.videoCount) : 0,
+                  description: channelInfo?.description || undefined,
+                  thumbnailUrl: channelInfo?.thumbnailUrl || undefined,
+                },
+                create: {
                   channelId: videoData.channelId,
                   channelTitle: videoData.channelTitle,
                   channelUrl: videoData.channelUrl,
@@ -177,10 +193,10 @@ class SearchScheduler {
                   videoCount: channelInfo ? parseCountString(channelInfo.videoCount) : 0,
                   description: channelInfo?.description,
                   thumbnailUrl: channelInfo?.thumbnailUrl,
-                },
+                }
               });
               
-              console.log(`[Scheduler] Created new influencer: ${videoData.channelTitle}`);
+              console.log(`[Scheduler] Created/updated influencer: ${videoData.channelTitle}`);
             }
             
             // Create video record within the same transaction
