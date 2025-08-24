@@ -2,8 +2,9 @@ import YouTubeScraper from './youtube-scraper';
 import TikTokScraper from './tiktok-scraper';
 import InstagramScraper from './instagram-scraper';
 import TwitterScraper from './twitter-scraper';
+import RedditScraper from './reddit-scraper';
 
-export type Platform = 'YOUTUBE' | 'TIKTOK' | 'INSTAGRAM' | 'TWITTER';
+export type Platform = 'YOUTUBE' | 'TIKTOK' | 'INSTAGRAM' | 'TWITTER' | 'REDDIT';
 
 export interface VideoData {
   videoId: string;
@@ -44,6 +45,8 @@ export class ScraperFactory {
         return new YouTubeScraper();
       case 'TIKTOK':
         return new TikTokScraper();
+      case 'REDDIT':
+        return new RedditScraper();
       case 'INSTAGRAM':
         throw new Error('Instagram scraper coming soon - API integration required');
       case 'TWITTER':

@@ -109,6 +109,7 @@ enum Platform {
   TIKTOK
   INSTAGRAM
   TWITTER
+  REDDIT
 }
 
 model Scan {
