@@ -73,6 +73,7 @@ export default function TopicManager({
               >
                 <option value="YOUTUBE">YouTube</option>
                 <option value="TIKTOK">TikTok</option>
+                <option value="REDDIT">Reddit</option>
                 <option value="INSTAGRAM" disabled>Instagram (Coming Soon)</option>
                 <option value="TWITTER" disabled>Twitter/X (Coming Soon)</option>
               </select>
@@ -118,6 +119,7 @@ export default function TopicManager({
                     <span className={`px-2 py-1 text-xs rounded-full ${
                       topic.platform === 'YOUTUBE' ? 'bg-red-100 text-red-800' : 
                       topic.platform === 'TIKTOK' ? 'bg-black text-white' :
+                      topic.platform === 'REDDIT' ? 'bg-orange-100 text-orange-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
                       {topic.platform}
