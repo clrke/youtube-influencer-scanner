@@ -375,6 +375,7 @@ export default function Home() {
                     <option value="ALL">All Platforms</option>
                     <option value="YOUTUBE">YouTube</option>
                     <option value="TIKTOK">TikTok</option>
+                    <option value="REDDIT">Reddit</option>
                     <option value="INSTAGRAM">Instagram</option>
                     <option value="TWITTER">Twitter</option>
                   </select>
