@@ -1,4 +1,5 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
+import { closeBrowser } from './browser-utils';
 
 export interface VideoData {
   videoId: string;
@@ -29,6 +30,9 @@ class YouTubeScraper {
   private page: Page | null = null;
 
   async initialize(retries = 3) {
+    // Never leave a previous browser running when (re)initializing
+    await this.close();
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         console.log(`[YouTube Scraper] Initializing browser (attempt ${attempt}/${retries})...`);
@@ -75,11 +79,7 @@ class YouTubeScraper {
         
         // Clean up any partially initialized resources
         if (this.browser) {
-          try {
-            await this.browser.close();
-          } catch (closeError) {
-            console.error('[YouTube Scraper] Error closing browser:', closeError);
-          }
+          await closeBrowser(this.browser);
           this.browser = null;
           this.page = null;
         }
@@ -102,8 +102,7 @@ class YouTubeScraper {
     // Check if page is still connected
     if (!this.page || this.page.isClosed()) {
       console.log('[YouTube Scraper] Page was closed, reinitializing...');
-      this.browser = null;
-      this.page = null;
+      await this.close();
       await this.initialize();
     }
     
@@ -334,11 +333,10 @@ class YouTubeScraper {
   }
 
   async close() {
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-      this.page = null;
-    }
+    const browser = this.browser;
+    this.browser = null;
+    this.page = null;
+    await closeBrowser(browser);
   }
 
   private delay(ms: number) {

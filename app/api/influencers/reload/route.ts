@@ -82,9 +82,14 @@ export async function POST(request: NextRequest) {
         await scanService.log(scan.id, 'info', `Re-scraping ${influencer.platform} influencer: ${influencer.channelTitle}`);
         
         const scraper = ScraperFactory.createScraper(influencer.platform as any);
-        await scraper.initialize();
-
-        const channelInfo = await scraper.getChannelInfo(influencer.channelUrl);
+        let channelInfo;
+        try {
+          await scraper.initialize();
+          channelInfo = await scraper.getChannelInfo(influencer.channelUrl);
+        } finally {
+          // Always release the browser, even if scraping fails
+          await scraper.close();
+        }
         
         if (channelInfo) {
           // Update influencer with fresh data
@@ -120,8 +125,6 @@ export async function POST(request: NextRequest) {
           await scanService.log(scan.id, 'warning', `Failed to update ${influencer.channelTitle}: Could not fetch channel info`);
         }
 
-        await scraper.close();
-        
         // Add delay between requests to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 2000));
         
