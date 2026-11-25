@@ -79,7 +79,6 @@ class SearchScheduler {
           // Check for cancellation
           if (await scanService.checkShouldCancel(scan.id)) {
             await scanService.completeScan(scan.id, 'cancelled', 'Scan was cancelled during video processing');
-            await scraper.close();
             return;
           }
 
@@ -230,6 +229,7 @@ class SearchScheduler {
         }
       }
       
+      // Release the browser before post-processing
       await scraper.close();
       
       await scanService.log(scan.id, 'info', 'Cleaning up orphaned influencers...');
@@ -241,6 +241,8 @@ class SearchScheduler {
     } catch (error) {
       await scanService.log(scan.id, 'error', `Error during ${platform} search: ${error}`);
       await scanService.completeScan(scan.id, 'error', `Failed ${platform} search for ${topicName}: ${error}`);
+    } finally {
+      // Always release the browser, whatever path the scan took
       await scraper.close();
     }
   }
