@@ -1,4 +1,5 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
+import { closeBrowser } from './browser-utils';
 
 interface TikTokVideoData {
   videoId: string;
@@ -30,6 +31,9 @@ class TikTokScraper {
   private page: Page | null = null;
 
   async initialize(retries = 3) {
+    // Never leave a previous browser running when (re)initializing
+    await this.close();
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         console.log(`[TikTok Scraper] Initializing browser (attempt ${attempt}/${retries})...`);
@@ -82,11 +86,7 @@ class TikTokScraper {
         
         // Clean up any partially initialized resources
         if (this.browser) {
-          try {
-            await this.browser.close();
-          } catch (closeError) {
-            console.error('[TikTok Scraper] Error closing browser:', closeError);
-          }
+          await closeBrowser(this.browser);
           this.browser = null;
           this.page = null;
         }
@@ -109,8 +109,7 @@ class TikTokScraper {
     // Check if page is still connected
     if (!this.page || this.page.isClosed()) {
       console.log('[TikTok Scraper] Page was closed, reinitializing...');
-      this.browser = null;
-      this.page = null;
+      await this.close();
       await this.initialize();
     }
 
@@ -300,11 +299,10 @@ class TikTokScraper {
   }
 
   async close() {
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-      this.page = null;
-    }
+    const browser = this.browser;
+    this.browser = null;
+    this.page = null;
+    await closeBrowser(browser);
   }
 
   private delay(ms: number) {

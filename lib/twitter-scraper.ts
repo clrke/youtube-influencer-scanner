@@ -1,4 +1,5 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
+import { closeBrowser } from './browser-utils';
 
 interface TwitterPostData {
   videoId: string;
@@ -30,6 +31,9 @@ class TwitterScraper {
   private page: Page | null = null;
 
   async initialize() {
+    // Never leave a previous browser running when (re)initializing
+    await this.close();
+
     this.browser = await puppeteer.launch({
       headless: process.env.HEADLESS_BROWSER !== 'false',
       args: [
@@ -240,11 +244,10 @@ class TwitterScraper {
   }
 
   async close() {
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-      this.page = null;
-    }
+    const browser = this.browser;
+    this.browser = null;
+    this.page = null;
+    await closeBrowser(browser);
   }
 
   private delay(ms: number) {

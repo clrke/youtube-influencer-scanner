@@ -3,6 +3,8 @@ version: '3.8'
 services:
   app:
     build: .
+    # Run tini as PID 1 so exited Chromium processes are reaped instead of piling up as zombies
+    init: true
     ports:
       - "3697:3697"
     environment:
